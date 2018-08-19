@@ -1,0 +1,461 @@
+// WINDOWING FUNCTIONS got introduced in HIVE 0.11
+
+create table stocks (
+date_ String, 
+Ticker String, 
+Open Double, 
+High Double, 
+Low Double, 
+Close Double, 
+Volume_for_the_day int) 
+row format delimited 
+fields terminated by ',';
+
+LOAD DATA LOCAL INPATH '/home/cloudera/stocks.txt' OVERWRITE INTO TABLE stocks;
+
+//LAG function returns the values of the previous row.
+//LAG FUNCTION WITH NO DEFAULT OFFSET, IT WILL PRINT NULL IF THERE IS NO LAGGING VALUE
+SELECT
+ticker,
+date_,close,
+LAG(close) OVER(PARTITION BY ticker ORDER by close ) AS yesterday_price 
+FROM stocks;
+
+Output:
+
+ZMH	20100804	54.83	NULL
+ZMH	20100805	54.5	54.83
+ZMH	20100803	54.19	54.5
+ZMH	20100809	53.99	54.19
+ZMH	20100806	53.98	53.99
+
+
+//LAG FUNCTION WITH DEFAULT OFFSET minus one
+SELECT
+ticker,
+date_,close,
+LAG(close,1,-1) OVER(PARTITION BY ticker ORDER by close desc) AS yesterday_price 
+FROM stocks;
+Output:
+
+ZMH	20100804	54.83	-1.0
+ZMH	20100805	54.5	54.83
+ZMH	20100803	54.19	54.5
+ZMH	20100809	53.99	54.19
+ZMH	20100806	53.98	53.99
+ZMH	20100810	53.9	53.98
+ZMH	20100727	53.87	53.9
+
+
+//LAG FUNCTION WITH DEFAULT OFFSET minus one with difference of ranking as 2
+SELECT
+ticker,
+date_,close,
+LAG(close,2,-1) OVER(PARTITION BY ticker ORDER by close DESC) AS yesterday_price 
+FROM stocks;
+
+Output:
+
+ZMH	20100804	54.83	-1.0
+ZMH	20100805	54.5	-1.0
+ZMH	20100803	54.19	54.83
+ZMH	20100809	53.99	54.5
+ZMH	20100806	53.98	54.19
+ZMH	20100810	53.9	53.99
+ZMH	20100727	53.87	53.98
+
+
+
+//Lead : This function returns the values from the following rows.
+
+SELECT
+ticker,
+date_,close,
+LEAD(close) OVER(PARTITION BY ticker ORDER by close ASC) AS yesterday_price 
+FROM stocks;
+
+OUTPUT:
+
+ZMH	20100820	49.82	50.22
+ZMH	20100819	50.22	51.0
+ZMH	20100816	51.0	51.21
+ZMH	20100817	51.21	51.44
+ZMH	20100813	51.44	52.0
+ZMH	20100812	52.0	52.01
+ZMH	20100811	52.01	52.16
+
+
+// WINDOWING DIFFERENCE IS 1 AND DEFAULT AS NULL
+
+SELECT
+ticker,
+date_,close,
+LEAD(close,1) OVER(PARTITION BY ticker ORDER by close ASC) AS yesterday_price 
+FROM stocks;
+
+OUTPUT:
+
+ZMH	20100820	49.82	50.22
+ZMH	20100819	50.22	51.0
+ZMH	20100816	51.0	51.21
+ZMH	20100817	51.21	51.44
+ZMH	20100813	51.44	52.0
+ZMH	20100812	52.0	52.01
+ZMH	20100811	52.01	52.16
+ZMH	20100810	53.9	53.98
+ZMH	20100806	53.98	53.99
+ZMH	20100809	53.99	54.19
+ZMH	20100803	54.19	54.5
+ZMH	20100805	54.5	54.83
+ZMH	20100804	54.83	NULL
+
+
+//WINDOWING DIFFERENCE IS 1 AND DEFAULT VALUE IS -1
+
+SELECT
+ticker,
+date_,close,
+LEAD(close,1,-1) OVER(PARTITION BY ticker ORDER by close ASC) AS yesterday_price 
+FROM stocks;
+
+Output:
+
+ZMH	20100727	53.87	53.9
+ZMH	20100810	53.9	53.98
+ZMH	20100806	53.98	53.99
+ZMH	20100809	53.99	54.19
+ZMH	20100803	54.19	54.5
+ZMH	20100805	54.5	54.83
+ZMH	20100804	54.83	-1.0
+
+
+//WINDOWING DIFFERENCE IS 2 AND DEFAULT VALUE IS -2
+
+SELECT
+ticker,
+date_,close,
+LEAD(close,2,-2) OVER(PARTITION BY ticker ORDER by close ASC) AS yesterday_price 
+FROM stocks;
+
+OUTPUT:
+
+ZMH	20100810	53.9	53.99
+ZMH	20100806	53.98	54.19
+ZMH	20100809	53.99	54.5
+ZMH	20100803	54.19	54.83
+ZMH	20100805	54.5	-2.0
+ZMH	20100804	54.83	-2.0
+
+
+//FIRST_VALUE  FUNCTON returns the value of the first row from that window
+
+SELECT 
+ticker,
+FIRST_VALUE(high) OVER(partition by ticker order by high asc ) as first_high 
+from  stocks
+;
+
+OUTPUT:
+
+ZMH	50.55
+ZMH	50.55
+ZMH	50.55
+ZMH	50.55
+ZMH	50.55
+ZMH	50.55
+
+
+SELECT 
+ticker,
+FIRST_VALUE(high) OVER(partition by ticker order by high DESC ) as first_high 
+from  stocks
+;
+
+OUTPUT:
+
+ZMH	55.3
+ZMH	55.3
+ZMH	55.3
+ZMH	55.3
+ZMH	55.3
+ZMH	55.3
+ZMH	55.3
+
+
+//LAST_VALUE FUNCTION is the reverse of FIRST_VALUE.
+//It returns the value of the last row from that window.
+
+
+//Count function returns the count of all the values for the expression written in the over clause.
+
+//this is equivalent to group by and count operations.
+SELECT
+ticker,
+COUNT(ticker) OVER(PARTITION BY ticker) AS cnt 
+FROM stocks;
+
+OUTPUT:
+XRAY	19
+XRX	22
+
+
+//Sum FUNCTION returns the sum of all the values for the expression written in the over clause
+
+
+select 
+ticker,
+date_,
+sum(volume_for_the_day) over(partition by ticker,date_ order by date_) as running_total 
+from stocks where ticker = 'ZMH';
+
+OUTPUT:
+
+ZMH	20100721	51647
+ZMH	20100722	58402
+ZMH	20100723	33743
+ZMH	20100726	35747
+ZMH	20100727	33207
+ZMH	20100728	40679
+ZMH	20100729	38369
+ZMH	20100730	26006
+
+
+//Min returns the minimum value of the column for the rows in that over clause. From the below query, we can find the minimum closing stock price for each particular ticker.
+
+select 
+ticker, 
+min(close) over(partition by ticker) as minimum 
+from 
+stocks
+;
+
+OUTPUT:
+
+ZMH	49.82
+ZMH	49.82
+ZMH	49.82
+ZMH	49.82
+ZMH	49.82
+ZMH	49.82
+ZMH	49.82
+
+
+//Max returns the maximum value of the column for the rows in that over clause. From the below query, we can find the maximum closing stock price for each particular ticker.
+
+select 
+ticker, 
+max(close) over(partition by ticker) as maximum 
+from STOCKS;
+
+
+OUTPUT:
+
+ZMH	54.83
+ZMH	54.83
+ZMH	54.83
+ZMH	54.83
+ZMH	54.83
+ZMH	54.83
+
+
+//AVG function returns the average value of the column for the rows that over clause returns. From the below query, we can find the average closing stock price for each particular ticker.
+
+select 
+ticker, 
+avg(close) over(partition by ticker) as average_of_close_value 
+from stocks;
+
+OUTPUT:
+
+ZMH	52.78
+ZMH	52.78
+ZMH	52.78
+ZMH	52.78
+ZMH	52.78
+ZMH	52.78
+
+
+//Rank function will return the rank of the values as per the result set of the over clause. If two values are same then it will give the same rank to those 2 values and then for the next value, the sub-sequent rank will be skipped.
+
+select 
+ticker,
+close,
+rank() over(partition by ticker order by close ) as closing from stocks ;
+
+OUTPUT:
+
+XRX	8.41	1
+XRX	8.97	2
+XRX	9.01	3
+XRX	9.02	4
+XRX	9.03	5
+XRX	9.05	6
+XRX	9.1	7
+XRX	9.24	8
+XRX	9.25	9
+XRX	9.27	10
+XRX	9.52	11
+XRX	9.53	12
+XRX	9.57	13
+XRX	9.59	14
+XRX	9.62	15
+XRX	9.63	16
+XRX	9.64	17
+XRX	9.65	18
+XRX	9.74	19
+XRX	9.74	19
+XRX	9.75	21
+XRX	9.82	22
+
+
+//DENSE_RANK FUNCTION will return the rank of the values as per the result set of the over clause. If two values are same then it will give the same rank to those 2 values and then for the next value. dense_rank function is more accurate than RANK FUNCTION AS IT DOES NOT SKIP ANY RANK VALUE.
+//Each unique value will get the ranks in a sequence.
+
+
+select 
+ticker,
+close,
+dense_rank() over(partition by ticker order by close ) as closing from stocks WHERE ticker = 'XRX';
+
+OUTPUT:
+
+XRX	8.41	1
+XRX	8.97	2
+XRX	9.01	3
+XRX	9.02	4
+XRX	9.03	5
+XRX	9.05	6
+XRX	9.1	7
+XRX	9.24	8
+XRX	9.25	9
+XRX	9.27	10
+XRX	9.52	11
+XRX	9.53	12
+XRX	9.57	13
+XRX	9.59	14
+XRX	9.62	15
+XRX	9.63	16
+XRX	9.64	17
+XRX	9.65	18
+XRX	9.74	19
+XRX	9.74	19
+XRX	9.75	20
+XRX	9.82	21
+
+
+
+Row_number
+
+Row number will return the continuous sequence of numbers for all the rows of the result set of the over clause.
+
+select 
+ticker,
+close,
+row_number() over(partition by ticker order by close) as num 
+from 
+stocks WHERE ticker = 'XRX';
+
+output:
+
+XRX	8.41	1
+XRX	8.97	2
+XRX	9.01	3
+XRX	9.02	4
+XRX	9.03	5
+XRX	9.05	6
+XRX	9.1	7
+XRX	9.24	8
+XRX	9.25	9
+XRX	9.27	10
+XRX	9.52	11
+XRX	9.53	12
+XRX	9.57	13
+XRX	9.59	14
+XRX	9.62	15
+XRX	9.63	16
+XRX	9.64	17
+XRX	9.65	18
+XRX	9.74	19
+XRX	9.74	20
+XRX	9.75	21
+XRX	9.82	22
+
+
+
+//Cume_dist returns the cumulative distribution of a value. It results from 0 to 1. For suppose if the total number of records are 10 then for the 1st row the cume_dist will be 1/10 and for the second 2/10 and so on till 10/10.
+
+This cume_dist will be calculated in accordance with the result set returned by the over clause. The below query will result in the cumulative of each record for every ticker.
+
+select 
+ticker,
+cume_dist() over(partition by ticker order by close) as cummulative 
+from stocks;
+
+OUTPUT:
+
+ZMH	0.045454545454545456
+ZMH	0.09090909090909091
+ZMH	0.13636363636363635
+ZMH	0.18181818181818182
+ZMH	0.22727272727272727
+ZMH	0.2727272727272727
+ZMH	0.3181818181818182
+ZMH	0.36363636363636365
+ZMH	0.4090909090909091
+ZMH	0.45454545454545453
+ZMH	0.5
+ZMH	0.5454545454545454
+ZMH	0.5909090909090909
+ZMH	0.6363636363636364
+ZMH	0.6818181818181818
+ZMH	0.7272727272727273
+ZMH	0.7727272727272727
+ZMH	0.8181818181818182
+ZMH	0.8636363636363636
+ZMH	0.9090909090909091
+ZMH	0.9545454545454546
+ZMH	1.0
+
+
+//Percent_rank FUNCTION returns the percentage rank of each row within the result set of over clause. 
+
+select 
+ticker,
+PERCENT_RANK() over(partition by ticker order by close) as cummulative 
+from stocks;
+
+//Ntile FUNCTION returns the bucket number of the particular value. For suppose if you say Ntile(5) then it will create 5 buckets based on the result set of the over clause after that it will place the first 20% of the records in the 1st bucket and so on till 5th bucket.
+
+
+select ticker,ntile(10) over(partition by ticker order by close ) as bucket from stocks;
+
+OUTPUT:
+
+ZMH	1
+ZMH	1
+ZMH	1
+ZMH	2
+ZMH	2
+ZMH	2
+ZMH	3
+ZMH	3
+ZMH	4
+ZMH	4
+ZMH	5
+ZMH	5
+ZMH	6
+ZMH	6
+ZMH	7
+ZMH	7
+ZMH	8
+ZMH	8
+ZMH	9
+ZMH	9
+ZMH	10
+ZMH	10
+
+
+
+
+
+
